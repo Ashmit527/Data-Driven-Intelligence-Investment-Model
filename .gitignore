@@ -17,6 +17,8 @@ data/raw_pdfs/*.pdf
 data/embeddings/
 data/extracted_text/
 data/chunks/
+data/faiss_index.bin
+data/chunk_metadata.pkl
 *.faiss
 *.index
 
