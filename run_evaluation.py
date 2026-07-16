@@ -35,4 +35,4 @@ def run_evaluation(eval_path, output_path):
 
 
 if __name__ == "__main__":
-    run_evaluation("data/evaluation/eval_questions.json", "data/evaluation/eval_results.json")
+    run_evaluation("data/evaluation/eval_questions.json", "data/evaluation/eval_results.json")  
