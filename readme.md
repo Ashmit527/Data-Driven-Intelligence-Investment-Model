@@ -1,35 +1,34 @@
 # AI Trading Research Assistant
 
-A RAG + agentic AI system for answering questions about NSE-listed companies using their financial filings and live market data.
+A RAG + agentic AI system for answering questions about NSE-listed companies using their financial filings and live market data — built as a fully local, free pipeline from raw PDFs to a deployed API.
 
-## Status: Phase 1 & Phase 2 complete — entering Phase 3 (MLOps / Deployment)
+## Status: Complete (Phases 1-3)
 
-## Overview
+## What This Is
 
-This project combines two complementary data sources to answer questions about NSE-listed companies:
+Ask a plain-English question about Adani, Infosys, Reliance, SBI, or Tata Motors, and get a grounded answer that pulls from:
+- **Annual report filings (PDFs)** — for qualitative questions (risk factors, strategy, management commentary)
+- **Live market data (yfinance)** — for numeric questions (price, revenue, ratios)
+- **A calculator layer** — for any derived metric (P/E, YoY growth, margins, ROE, ROA, etc.), so the LLM never does arithmetic itself
 
-- **Company annual reports (PDFs)** — via a RAG pipeline, for qualitative/narrative questions (risk factors, management commentary, strategy, business outlook)
-- **Live/structured financial data (yfinance)** — for numeric/quantitative questions (revenue, ratios, live prices, financial metrics)
+An agent (running locally via Ollama) decides which tool(s) to call per question, chains them when needed, and the whole thing is exposed as a FastAPI service with request logging and experiment tracking.
 
-An agentic layer sits on top of both, deciding which tool(s) to call per question and chaining them when needed (e.g., fetching two years of data before calculating growth).
+## Why This Project
 
-The system is built entirely with free, local tools — no paid APIs required.
-
-## Companies Covered
-
-Adani, Infosys, Reliance Industries, SBI, Tata Motors — FY 2025-26 annual reports and live market data.
+Started as an attempt to make sense of overlapping buzzwords (RAG, agentic AI, MLOps, LLMOps) by building one system that touches all of them in a coherent pipeline, rather than five disconnected tutorials. Also doubles as an early prototype toward a longer-term goal: a quant-driven platform for sharing and evaluating trading strategies.
 
 ## Architecture
 
 ```
                         ┌─────────────────────┐
-                        │   User Question      │
+                        │   FastAPI (/ask)      │
+                        │   + request logging    │
                         └──────────┬───────────┘
                                    │
                         ┌──────────▼───────────┐
                         │   Agent (qwen2.5:7b)  │
-                        │   decides which       │
-                        │   tool(s) to call      │
+                        │   decides which        │
+                        │   tool(s) to call        │
                         └──────────┬───────────┘
               ┌────────────────────┼────────────────────┐
               │                    │                     │
@@ -43,15 +42,13 @@ Adani, Infosys, Reliance Industries, SBI, Tata Motors — FY 2025-26 annual repo
                                    │
                         ┌──────────▼───────────┐
                         │  tool_sanitizer.py     │
-                        │  - format validation   │
-                        │  - grounding check     │
-                        │    (blocks fabricated  │
-                        │    calculator inputs)  │
+                        │  format + grounding    │
+                        │  verification           │
                         └──────────┬───────────┘
                                    │
                         ┌──────────▼───────────┐
-                        │   Final grounded       │
-                        │   answer + sources     │
+                        │   Grounded answer +     │
+                        │   sources, logged        │
                         └───────────────────────┘
 ```
 
@@ -64,27 +61,18 @@ retrieval → prompt construction → local LLM generation → grounded answer
 
 ## Roadmap
 
-- [x] **Phase 1: RAG pipeline** (Days 1-7)
-  - [x] PDF ingestion, extraction, chunk-level table filtering
-  - [x] Local embeddings (MiniLM) + FAISS vector search
-  - [x] Local LLM generation with source citations
-  - [x] Formal evaluation (25-question set) — see [`PHASE1_NOTES.md`](./PHASE1_NOTES.md)
-- [x] **Phase 2: Agentic layer** (Days 9-13)
-  - [x] Live financial data tool (yfinance) — price, TTM, and fiscal-year-specific metrics
-  - [x] Calculator tool — 10 financial ratio/growth functions
-  - [x] RAG search wrapped as a callable tool with company filtering
-  - [x] Tool-calling agent (qwen2.5:7b) with argument sanitization and grounding verification
-  - [x] Debugged and documented 6 distinct failure modes — see [`PHASE2_NOTES.md`](./PHASE2_NOTES.md)
-- [ ] **Phase 3: MLOps / deployment** (Days 14-18)
-  - [ ] FastAPI wrapper
-  - [ ] Request logging
-  - [ ] Experiment tracking
-  - [ ] Docker containerization
-  - [ ] Final documentation and polish
+- [x] **Phase 1: RAG pipeline** (Days 1-7) — see [`PHASE1_NOTES.md`](./PHASE1_NOTES.md)
+- [x] **Phase 2: Agentic layer** (Days 9-13) — see [`PHASE2_NOTES.md`](./PHASE2_NOTES.md)
+- [x] **Phase 3: MLOps / deployment** (Days 14-16, 18)
+  - [x] FastAPI wrapper (`/ask`, `/`)
+  - [x] Request logging (JSONL)
+  - [x] Experiment tracking (config + metrics comparison)
+  - [x] Docker containerization (host-networked Ollama)
+  - [x] Final documentation
 
-## Phase 1 Evaluation Summary
+## Evaluation Summary
 
-25 hand-written questions, manually scored against ground truth from the source PDFs:
+**Phase 1 (RAG, 25-question set):**
 
 | Metric | Result |
 |---|---|
@@ -92,60 +80,68 @@ retrieval → prompt construction → local LLM generation → grounded answer
 | Answer accuracy | 28% (7/25) |
 | Citation accuracy | 48% (12/25) |
 
-**Key finding:** RAG performs well on narrative/qualitative questions but poorly on precise numeric questions, since financial tables get filtered out during extraction rather than properly structured. This directly motivated Phase 2's decision to route numeric questions to live data instead. Full details in [`PHASE1_NOTES.md`](./PHASE1_NOTES.md).
+Numeric questions failed disproportionately due to table filtering during PDF extraction — this directly motivated Phase 2's live-data routing decision.
 
-## Phase 2 Highlights
+**Phase 2 (Agent, targeted testing across two models):**
 
-Building the agent surfaced six distinct, real failure modes during development — from malformed tool arguments to a small model writing fake tool-call text instead of using real function-calling, to a subtler bug where the agent fabricated plausible-but-fake numeric inputs to a calculator tool without ever fetching real data. Each was debugged, fixed, and documented rather than papered over. Full debugging journey, root causes, and fixes in [`PHASE2_NOTES.md`](./PHASE2_NOTES.md).
+| Model | Multi-step tool chains | Notable issues found |
+|---|---|---|
+| llama3.2:3b | Unreliable | Malformed arguments, field misuse, fake tool-call text |
+| qwen2.5:7b | Reliable in testing | Silent numeric fabrication (fixed via grounding verification) |
 
-**Key engineering addition:** a two-layer tool-call sanitizer (`tool_sanitizer.py`) that (1) validates argument format/types before execution, and (2) verifies every calculator input is *grounded* — i.e., actually matches a real number returned earlier in the conversation — rather than trusting the model's arguments at face value.
+Six distinct failure modes were found, debugged, and fixed or documented across Phase 2 — see `PHASE2_NOTES.md` for the full journey, including the grounding-verification layer that catches fabricated calculator inputs before they can produce confidently-wrong answers.
 
 ## Tech Stack
 
 - **PDF processing:** pdfplumber
 - **Embeddings:** sentence-transformers (`all-MiniLM-L6-v2`) — local, free
 - **Vector search:** FAISS (CPU, exact search)
-- **LLM (agent + generation):** qwen2.5:7b via Ollama — local, free, custom Modelfile with tuned temperature/top_p
+- **LLM (agent + generation):** qwen2.5:7b via Ollama — local, free, custom Modelfile
 - **Live financial data:** yfinance
-- **Planned (Phase 3):** FastAPI, Docker, experiment tracking
+- **API:** FastAPI + Uvicorn
+- **Logging/tracking:** custom JSONL-based request and experiment logs
+
+## Known Limitations (honest, not hidden)
+
+- PDF table extraction discards rather than structures tabular data — numeric PDF-only questions (not covered by live data) remain unreliable
+- Ticker mappings are hardcoded and require manual updates after corporate actions (e.g., the Tata Motors demerger encountered during this build)
+- Grounding verification uses tolerance-based numeric matching — could rarely misflag a legitimate recalculated value
+- No formal, scored evaluation set for the agent yet (Phase 1 had this rigor; Phase 2 validation was targeted/manual)
+- Docker setup runs the app in a container but relies on Ollama running on the host machine (via `host.docker.internal`) rather than being fully self-contained — a reasonable middle ground for a local project, not a full production deployment pattern
+- Local 7B-parameter generation is capable but not infallible — occasional fabrication risks remain even with grounding checks, particularly for failure modes not yet encountered in testing
 
 ## Project Structure
 
 ```
-data/
-  raw_pdfs/            # source annual report PDFs (not tracked)
-  extracted_text/      # raw extracted text per company (not tracked)
-  chunks/              # filtered, chunked text per company (not tracked)
-  embeddings/          # chunk embeddings per company (not tracked)
-  faiss_index.bin      # FAISS vector index (not tracked)
-  chunk_metadata.pkl   # chunk metadata for retrieval lookup (not tracked)
+data/                          # PDFs, extracted text, chunks, embeddings, FAISS index (not tracked)
+logs/                          # request + experiment logs (not tracked)
 
 # Phase 1 — RAG
-check_pdfs.py               # PDF sanity check
-extract_text.py              # PDF text extraction
-chunk_text.py                 # chunk-level table filtering + chunking
-generate_embeddings.py         # local embedding generation
-build_index.py                  # FAISS index construction
-generate_answer.py               # standalone full RAG pipeline (retrieve + generate)
-eval_questions.json                # Phase 1 evaluation set
-run_evaluation.py                   # Phase 1 eval runner
-summarize_eval.py                    # Phase 1 eval scoring
-PHASE1_NOTES.md                       # Phase 1 problems/fixes/limitations
+check_pdfs.py, extract_text.py, chunk_text.py, generate_embeddings.py,
+build_index.py, generate_answer.py, eval_questions.json,
+run_evaluation.py, summarize_eval.py, PHASE1_NOTES.md
 
 # Phase 2 — Agentic layer
-tools_document_search.py    # RAG search wrapped as a standalone tool
-tools_live_data.py           # live price + financial metrics (yfinance)
-tools_calculator.py           # financial ratio/growth calculators
-tools_schema.py                 # tool definitions (JSON schema) passed to the LLM
-tool_sanitizer.py                 # argument validation + grounding verification
-Modelfile                          # custom Ollama model (qwen2.5:7b + tuned params)
-agent.py                            # tool-calling orchestration loop
-agent_eval_questions.json             # agent evaluation set
-run_agent_evaluation.py                 # agent eval runner
-summarize_agent_eval.py                   # agent eval scoring
-PHASE2_NOTES.md                            # Phase 2 debugging journey + limitations
+tools_document_search.py, tools_live_data.py, tools_calculator.py,
+tools_schema.py, tool_sanitizer.py, Modelfile, agent.py,
+agent_eval_questions.json, run_agent_evaluation.py,
+summarize_agent_eval.py, PHASE2_NOTES.md
+
+# Phase 3 — MLOps
+api.py, request_logger.py, experiment_tracker.py
 ```
+
+## Running This Project
+
+1. Place annual report PDFs in `data/raw_pdfs/`
+2. Run the Phase 1 pipeline in order: `extract_text.py` → `chunk_text.py` → `generate_embeddings.py` → `build_index.py`
+3. `ollama create finance-agent -f Modelfile`
+4. Either run directly: `uvicorn api:app --reload`
+   or via Docker: `docker build -t trading-assistant .` then
+   `docker run -p 8000:8000 -e OLLAMA_HOST=http://host.docker.internal:11434 trading-assistant`
+   (Ollama must be running on the host machine either way)
+5. Visit `http://127.0.0.1:8000/docs` to test
 
 ## Notes
 
-Large data files (PDFs, extracted text, chunks, embeddings, the FAISS index) are excluded from version control via `.gitignore`. To reproduce: place annual report PDFs in `data/raw_pdfs/`, run the Phase 1 pipeline scripts in order, then `ollama create finance-agent -f Modelfile` before running `agent.py`.
+Large/generated files are excluded from version control via `.gitignore`. This project prioritizes honest, documented engineering — every phase's README notes real problems encountered and how (or whether) they were resolved, rather than presenting a frictionless narrative.

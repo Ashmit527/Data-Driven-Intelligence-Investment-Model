@@ -1,6 +1,7 @@
 import ollama
 import json
 import re
+import os
 
 from tools_document_search import search_documents
 from tools_live_data import get_live_price, get_ttm_metrics, get_financial_metrics
@@ -10,7 +11,7 @@ from tool_sanitizer import (
     sanitize_tool_args, EXPECTED_PARAMS, extract_numeric_values,
     verify_calculator_grounding
 )
-
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 MODEL_NAME = "finance-agent"  # custom model built from Modelfile (qwen2.5:7b based)
 
 TOOL_FUNCTIONS = {
@@ -48,7 +49,8 @@ def run_agent(user_question: str, max_steps: int = 8) -> tuple:
     retrieved_values = set()
 
     for step in range(max_steps):
-        response = ollama.chat(model=MODEL_NAME, messages=messages, tools=TOOLS)
+        client = ollama.Client(host=OLLAMA_HOST)
+        response = client.chat(model=MODEL_NAME, messages=messages, tools=TOOLS)
         message = response['message']
         messages.append(message)
 

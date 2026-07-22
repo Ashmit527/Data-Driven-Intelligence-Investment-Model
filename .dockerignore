@@ -1,0 +1,9 @@
+data/raw_pdfs/
+data/extracted_text/
+data/chunks/
+data/embeddings/
+logs/
+.git/
+__pycache__/
+*.pyc
+.env

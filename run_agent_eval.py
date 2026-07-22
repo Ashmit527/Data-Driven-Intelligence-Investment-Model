@@ -36,4 +36,4 @@ def run_agent_evaluation(eval_path, output_path):
 
 
 if __name__ == "__main__":
-    run_agent_evaluation("data/evaluation/agent_evals.json", "data/evaluation/agent_eval_results.json")
+    run_agent_evaluation("data/evaluation/agent_evals.json", "data/evaluation/agent_eval_results/qwen.json")
