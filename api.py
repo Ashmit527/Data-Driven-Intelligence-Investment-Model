@@ -20,7 +20,7 @@ class QuestionResponse(BaseModel):
 
 @app.get("/")
 def root():
-    return {"status": "ok", "message": "AI Trading Research Assistant API is running"}
+    return {"statuss": "ok", "message": "AI Trading Research Assistant API is running"}
 
 
 @app.post("/ask", response_model=QuestionResponse)
